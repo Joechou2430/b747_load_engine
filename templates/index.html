@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B747-400F Intelligent Load Planner</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 5px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+        .map-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 20px; }
+        .slot { width: 60px; height: 60px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; background: #eee; }
+        .slot.occupied { background: #4caf50; color: white; }
+        .slot.heavy { background: #2196f3; color: white; }
+        input, select, button { width: 100%; margin-bottom: 10px; padding: 8px; }
+    </style>
+</head>
+<body>
+    <h1>B747-400F Load Planner</h1>
+    <div class="container">
+        <div class="panel">
+            <h3>Add Cargo</h3>
+            <input id="dest" placeholder="Destination (e.g. LAX)" value="LAX">
+            <input id="weight" type="number" placeholder="Weight (kg)" value="1000">
+            <input id="volume" type="number" placeholder="Volume (cbm)" value="3">
+            <input id="len" type="number" placeholder="L (cm)">
+            <input id="wid" type="number" placeholder="W (cm)">
+            <input id="hgt" type="number" placeholder="H (cm)">
+            <select id="shc" multiple>
+                <option value="GEN">General</option>
+                <option value="HEA">Heavy</option>
+                <option value="RXB">Explosive</option>
+            </select>
+            <button onclick="addCargo()">Add</button>
+            <button onclick="runPlan()" style="background:orange;">Plan Flight</button>
+            <div id="cargoList"></div>
+        </div>
+        <div class="panel">
+            <h3>Load Plan Visualization</h3>
+            <div id="summary"></div>
+            <div class="map-container" id="map"></div>
+        </div>
+    </div>
+    <script>
+        let cargos = [];
+        function addCargo() {
+            cargos.push({
+                dest: document.getElementById('dest').value,
+                weight: document.getElementById('weight').value,
+                volume: document.getElementById('volume').value,
+                pieces: 1,
+                length: document.getElementById('len').value,
+                width: document.getElementById('wid').value,
+                height: document.getElementById('hgt').value,
+                shc: Array.from(document.getElementById('shc').selectedOptions).map(o=>o.value)
+            });
+            document.getElementById('cargoList').innerHTML = cargos.length + ' items added';
+        }
+        async function runPlan() {
+            const res = await fetch('/plan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cargos: cargos})
+            });
+            const data = await res.json();
+            document.getElementById('summary').innerText = `ULDs: ${data.summary.total_ulds}, Weight: ${data.summary.total_weight}`;
+            const map = document.getElementById('map');
+            map.innerHTML = '';
+            data.visualization.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'slot occupied ' + (u.type === 'G' ? 'heavy' : '');
+                div.innerText = u.pos + '\n' + u.type;
+                map.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
