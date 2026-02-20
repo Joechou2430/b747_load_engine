@@ -5,6 +5,24 @@ class SystemConfig:
     SHORING_DENSITY = 600.0     # kg/m3
     FLOOR_LIMIT_KG_M2 = 976.0   # kg/m2
 
+class DoorLimits:
+    """
+    B747-400F Cargo Door Dimensions (Clear Opening)
+    Source: Manual Figures 33.1.7 - 33.1.13
+    Units: cm
+    """
+    # Main Deck Nose Door (Approx. Safe Rect)
+    NOSE_DOOR = {"max_h": 244.0, "max_w": 269.0, "name": "Nose Door"}
+
+    # Main Deck Side Cargo Door (SCD)
+    SIDE_DOOR = {"max_h": 305.0, "max_w": 340.0, "name": "Side Cargo Door"}
+
+    # Lower Deck Doors (FWD & AFT)
+    LOWER_DOOR = {"max_h": 167.0, "max_w": 264.0, "name": "Lower Deck Door"}
+
+    # Bulk Door
+    BULK_DOOR = {"max_h": 111.0, "max_w": 119.0, "name": "Bulk Door"}
+
 class ULDLibrary:
     """ B747-400F ULD Specifications """
     SPECS = {
@@ -24,7 +42,6 @@ class ULDLibrary:
 class AircraftMap:
     """ 
     B747-400F Positions & Interlocks
-    Source: Weight and Balance Manual
     """
     
     # Main Deck Centroids (Inches)
@@ -46,7 +63,8 @@ class AircraftMap:
     ROW_ZONES = ["C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "P", "Q", "R", "S"]
 
     @classmethod
-    def initialize_main_deck(cls):
+    def initialize_maps(cls):
+        # Build Main Deck with Longitudinal Interlock
         for i, z in enumerate(cls.ROW_ZONES):
             arm = cls.CENTROIDS[z]
             cls.MAIN_POSITIONS[f"{z}L"] = {"deck": "Main", "type": "Left",   "arm": arm, "conflicts": [f"{z}C"]}
@@ -60,9 +78,9 @@ class AircraftMap:
             
             cls.MAIN_POSITIONS[f"{z}C"] = {"deck": "Main", "type": "Center", "arm": arm, "conflicts": conflicts}
 
-    # Lower Deck Positions (Complete Definition)
+    # Lower Deck Positions
     LOWER_POSITIONS = {
-        # FWD Compartment
+        # FWD
         "11P": {"deck": "Lower", "type": "Center", "arm": 513.2, "conflicts": ["11L", "11R"]},
         "11L": {"deck": "Lower", "type": "Left",   "arm": 510.4, "conflicts": ["11P"]},
         "11R": {"deck": "Lower", "type": "Right",  "arm": 510.4, "conflicts": ["11P"]},
@@ -71,7 +89,6 @@ class AircraftMap:
         "12R": {"deck": "Lower", "type": "Right",  "arm": 571.6, "conflicts": ["12P"]},
         "13L": {"deck": "Lower", "type": "Left",   "arm": 632.9, "conflicts": ["12P"]},
         "13R": {"deck": "Lower", "type": "Right",  "arm": 632.9, "conflicts": ["12P"]},
-        
         "21P": {"deck": "Lower", "type": "Center", "arm": 744.7, "conflicts": ["21L", "21R", "22L", "22R"]},
         "21L": {"deck": "Lower", "type": "Left",   "arm": 713.9, "conflicts": ["21P"]},
         "21R": {"deck": "Lower", "type": "Right",  "arm": 713.9, "conflicts": ["21P"]},
@@ -85,8 +102,7 @@ class AircraftMap:
         "24R": {"deck": "Lower", "type": "Right",  "arm": 895.4, "conflicts": ["23P"]},
         "25L": {"deck": "Lower", "type": "Left",   "arm": 956.4, "conflicts": ["23P"]},
         "25R": {"deck": "Lower", "type": "Right",  "arm": 956.4, "conflicts": ["23P"]},
-
-        # AFT Compartment
+        # AFT
         "31P": {"deck": "Lower", "type": "Center", "arm": 1534.6, "conflicts": ["31L", "31R", "32L", "32R"]},
         "31L": {"deck": "Lower", "type": "Left",   "arm": 1517.0, "conflicts": ["31P"]},
         "31R": {"deck": "Lower", "type": "Right",  "arm": 1517.0, "conflicts": ["31P"]},
@@ -121,5 +137,4 @@ class AircraftMap:
             if start <= arm < end: return limit
         return 16.3
 
-# Initialize static data
-AircraftMap.initialize_main_deck()
+AircraftMap.initialize_maps()

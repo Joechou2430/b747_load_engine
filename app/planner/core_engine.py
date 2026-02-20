@@ -4,26 +4,35 @@ from ..config import ULDLibrary, AircraftMap
 from ..logic.shoring import ShoringEngine
 from ..logic.segregation import SegregationEngine
 from ..logic.structural import StructuralEngine
+from ..logic.gatekeeper import Gatekeeper
 from .math_solver import MathematicalPlanner
 
 class CorePlanningEngine:
     def __init__(self, route: List[str]):
         self.route = route
         self.packed_ulds: List[PackedULD] = []
+        self.rejected_cargos: List[Dict] = []
         self.math_solver = MathematicalPlanner()
 
     def plan_flight(self, new_cargos: List[CargoRequest]):
         std_cargos = []
-        # Pre-process cargos
+        
         for c in new_cargos:
+            # 1. Door Validation
+            door_check = Gatekeeper.validate_door_entry(c)
+            if not door_check["pass"]:
+                self.rejected_cargos.append({"id": c.id, "reason": door_check["reason"]})
+                continue
+
+            # 2. Shoring Calculation
             rec = ShoringEngine.recommend_type(c)
-            # Calculate Shoring needs (using dummy arm 320 for conservative check)
             shore_res = ShoringEngine.calculate_shoring_needs(c, rec["type"], 320)
             
             if shore_res["needed"]:
                 c.weight += shore_res["weight"]
                 c.dims[0]['h'] += shore_res["height"]
             
+            # 3. Identify Special Cargo
             is_special = (
                 c.assigned_uld_type or 
                 rec["type"] not in ["M", "M_LOWER", "K"] or 
@@ -36,15 +45,16 @@ class CorePlanningEngine:
             else:
                 std_cargos.append(c)
         
-        # Batch Optimization for standard cargos
+        # 4. Batch Optimization
         lower_cargos = [c for c in std_cargos if 0 < c.max_height <= 163]
         main_cargos = [c for c in std_cargos if c not in lower_cargos]
         
         if lower_cargos: self._batch_optimize(lower_cargos, "M_LOWER")
         if main_cargos: self._batch_optimize(main_cargos, "M")
 
-        # Allocation
+        # 5. Aircraft Allocation
         self._allocate_to_aircraft()
+        
         return self._generate_report()
 
     def _batch_optimize(self, cargos: List[CargoRequest], uld_type: str):
@@ -63,7 +73,6 @@ class CorePlanningEngine:
         rec = ShoringEngine.recommend_type(cargo)
         target_type = cargo.assigned_uld_type or rec["type"]
         
-        # Attempt to fit in existing open ULDs
         for uld in self.packed_ulds:
             if uld.uld_type == target_type and uld.status == "OPEN" and uld.destination == cargo.destination:
                  if not all(SegregationEngine.check_mix(uld.shc_codes, s) for s in cargo.shc): continue
@@ -76,7 +85,6 @@ class CorePlanningEngine:
                      uld.shc_codes.update(cargo.shc)
                      return
         
-        # Create new ULD
         new_uld = PackedULD(f"SPL-{len(self.packed_ulds)+1:03d}", target_type, ULDLibrary.SPECS[target_type]['contour'], cargo.destination)
         new_uld.items.append(cargo)
         new_uld.total_weight += cargo.weight
@@ -86,7 +94,6 @@ class CorePlanningEngine:
 
     def _allocate_to_aircraft(self):
         occupied = set()
-        # Sort ULDs for placement priority
         ulds = sorted(self.packed_ulds, key=lambda x: (
             x.uld_type not in ["G", "R"], 
             x.uld_type not in ["M_LOWER", "A_LOWER"], 
@@ -112,19 +119,19 @@ class CorePlanningEngine:
             for pid, info in candidates:
                 if pid in occupied: continue
                 
-                # Bi-directional Interlock Check
+                # Check My Conflicts
                 conflict = False
                 for c in info.get("conflicts", []):
                     if c in occupied: conflict = True; break
                 if conflict: continue
                 
+                # Reverse Check
                 for occ_pid in occupied:
                     occ_info = AircraftMap.MAIN_POSITIONS.get(occ_pid) or AircraftMap.LOWER_POSITIONS.get(occ_pid)
                     if occ_info and pid in occ_info.get("conflicts", []):
                         conflict = True; break
                 if conflict: continue
 
-                # Structural Limit Check
                 if not StructuralEngine.check_placement(uld, info['arm']): continue
                 
                 uld.assigned_position = pid
@@ -138,6 +145,7 @@ class CorePlanningEngine:
     def _generate_report(self):
         return {
             "summary": {"total_ulds": len(self.packed_ulds), "total_weight": sum(u.gross_weight for u in self.packed_ulds)},
+            "rejected": self.rejected_cargos,
             "visualization": [
                 {"pos": u.assigned_position, "uld": u.id, "type": u.uld_type, "weight": f"{u.gross_weight:.0f}", "arm": u.assigned_arm} 
                 for u in self.packed_ulds if u.assigned_position != "UNASSIGNED"
