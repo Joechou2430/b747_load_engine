@@ -6,34 +6,20 @@ class SystemConfig:
     FLOOR_LIMIT_KG_M2 = 976.0   # kg/m2
 
 class DoorLimits:
-    """
-    B747-400F Cargo Door Dimensions (Clear Opening)
-    Source: Manual Figures 33.1.7 - 33.1.13
-    Units: cm
-    """
-    # Main Deck Nose Door (Approx. Safe Rect)
+    """ Cargo Door Dimensions (cm) """
     NOSE_DOOR = {"max_h": 244.0, "max_w": 269.0, "name": "Nose Door"}
-
-    # Main Deck Side Cargo Door (SCD)
     SIDE_DOOR = {"max_h": 305.0, "max_w": 340.0, "name": "Side Cargo Door"}
-
-    # Lower Deck Doors (FWD & AFT)
     LOWER_DOOR = {"max_h": 167.0, "max_w": 264.0, "name": "Lower Deck Door"}
-
-    # Bulk Door
     BULK_DOOR = {"max_h": 111.0, "max_w": 119.0, "name": "Bulk Door"}
 
 class ULDLibrary:
     """ B747-400F ULD Specifications """
     SPECS = {
-        # Main Deck Pallets
         "M":      {"code": "PMC-Q6", "contour": "Q6",    "max_gross": 6804.0,  "tare": 120.0, "max_vol": 19.0, "len": 125, "wid": 96},
         "M_Q7":   {"code": "PMC-Q7", "contour": "Q7",    "max_gross": 6804.0,  "tare": 120.0, "max_vol": 24.0, "len": 125, "wid": 96},
         "A":      {"code": "PAG",    "contour": "Q6",    "max_gross": 6033.0,  "tare": 110.0, "max_vol": 17.0, "len": 125, "wid": 88},
         "R":      {"code": "PRA",    "contour": "FLAT",  "max_gross": 11340.0, "tare": 400.0, "max_vol": 27.0, "len": 196, "wid": 96},
         "G":      {"code": "PGA",    "contour": "FLAT",  "max_gross": 13608.0, "tare": 500.0, "max_vol": 33.0, "len": 238.5,"wid": 96},
-        
-        # Lower Deck Units
         "K":      {"code": "AKE",    "contour": "LD3",   "max_gross": 1587.0,  "tare": 90.0,  "max_vol": 4.3,  "len": 61.5, "wid": 60.4},
         "M_LOWER":{"code": "PMC-LD", "contour": "LOWER", "max_gross": 5035.0,  "tare": 120.0, "max_vol": 11.5, "len": 125, "wid": 96},
         "A_LOWER":{"code": "PAG-LD", "contour": "LOWER", "max_gross": 4626.0,  "tare": 110.0, "max_vol": 10.5, "len": 125, "wid": 88}
@@ -62,25 +48,8 @@ class AircraftMap:
     
     ROW_ZONES = ["C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "P", "Q", "R", "S"]
 
-    @classmethod
-    def initialize_maps(cls):
-        # Build Main Deck with Longitudinal Interlock
-        for i, z in enumerate(cls.ROW_ZONES):
-            arm = cls.CENTROIDS[z]
-            cls.MAIN_POSITIONS[f"{z}L"] = {"deck": "Main", "type": "Left",   "arm": arm, "conflicts": [f"{z}C"]}
-            cls.MAIN_POSITIONS[f"{z}R"] = {"deck": "Main", "type": "Right",  "arm": arm, "conflicts": [f"{z}C"]}
-            
-            # Center Position Interlocks (Current Row Side + Next Row All)
-            conflicts = [f"{z}L", f"{z}R"] 
-            if i + 1 < len(cls.ROW_ZONES):
-                next_z = cls.ROW_ZONES[i+1]
-                conflicts.extend([f"{next_z}L", f"{next_z}R", f"{next_z}C"])
-            
-            cls.MAIN_POSITIONS[f"{z}C"] = {"deck": "Main", "type": "Center", "arm": arm, "conflicts": conflicts}
-
     # Lower Deck Positions
     LOWER_POSITIONS = {
-        # FWD
         "11P": {"deck": "Lower", "type": "Center", "arm": 513.2, "conflicts": ["11L", "11R"]},
         "11L": {"deck": "Lower", "type": "Left",   "arm": 510.4, "conflicts": ["11P"]},
         "11R": {"deck": "Lower", "type": "Right",  "arm": 510.4, "conflicts": ["11P"]},
@@ -102,7 +71,6 @@ class AircraftMap:
         "24R": {"deck": "Lower", "type": "Right",  "arm": 895.4, "conflicts": ["23P"]},
         "25L": {"deck": "Lower", "type": "Left",   "arm": 956.4, "conflicts": ["23P"]},
         "25R": {"deck": "Lower", "type": "Right",  "arm": 956.4, "conflicts": ["23P"]},
-        # AFT
         "31P": {"deck": "Lower", "type": "Center", "arm": 1534.6, "conflicts": ["31L", "31R", "32L", "32R"]},
         "31L": {"deck": "Lower", "type": "Left",   "arm": 1517.0, "conflicts": ["31P"]},
         "31R": {"deck": "Lower", "type": "Right",  "arm": 1517.0, "conflicts": ["31P"]},
@@ -131,10 +99,52 @@ class AircraftMap:
         (1480, 1920, 77.1), (1920, 2500, 16.3)
     ]
 
+    # Cumulative Zone Limits (Pivot Weights)
+    # Source: Figure 33.1.18
+    ZONE_LIMITS = {
+        "FWD_LOWER": {"start": 360, "end": 1000, "limit": 27669},
+        "AFT_LOWER": {"start": 1480, "end": 1900, "limit": 26081},
+        "BULK":      {"start": 1900, "end": 2160, "limit": 4408},
+        "WINGBOX":   {"start": 1000, "end": 1480, "limit": 45000} # Estimated limit for Main Deck center
+    }
+
+    # Disabled Positions
+    DISABLED_POSITIONS = set()
+
+    @classmethod
+    def initialize_maps(cls):
+        # 1. Build Main Deck Positions
+        cls.MAIN_POSITIONS = {
+            "A1": {"deck": "Main", "type": "Center", "arm": 320.0, "conflicts": []},
+            "A2": {"deck": "Main", "type": "Center", "arm": 379.0, "conflicts": []},
+            "B":  {"deck": "Main", "type": "Center", "arm": 453.0, "conflicts": []},
+            "T":  {"deck": "Main", "type": "Center", "arm": 2296.0, "conflicts": []},
+        }
+        
+        for i, z in enumerate(cls.ROW_ZONES):
+            arm = cls.CENTROIDS[z]
+            cls.MAIN_POSITIONS[f"{z}L"] = {"deck": "Main", "type": "Left",   "arm": arm, "conflicts": [f"{z}C"]}
+            cls.MAIN_POSITIONS[f"{z}R"] = {"deck": "Main", "type": "Right",  "arm": arm, "conflicts": [f"{z}C"]}
+            
+            conflicts = [f"{z}L", f"{z}R"] 
+            if i + 1 < len(cls.ROW_ZONES):
+                next_z = cls.ROW_ZONES[i+1]
+                conflicts.extend([f"{next_z}L", f"{next_z}R", f"{next_z}C"])
+            cls.MAIN_POSITIONS[f"{z}C"] = {"deck": "Main", "type": "Center", "arm": arm, "conflicts": conflicts}
+
+        # 2. Filter Disabled Positions
+        for pid in list(cls.MAIN_POSITIONS.keys()):
+            if pid in cls.DISABLED_POSITIONS:
+                del cls.MAIN_POSITIONS[pid]
+        
+        for pid in list(cls.LOWER_POSITIONS.keys()):
+            if pid in cls.DISABLED_POSITIONS:
+                del cls.LOWER_POSITIONS[pid]
+
     @staticmethod
     def get_linear_limit(arm: float) -> float:
-        for start, end, limit in AircraftMap.LINEAR_LIMITS:
-            if start <= arm < end: return limit
+        for s, e, l in AircraftMap.LINEAR_LIMITS:
+            if s <= arm < e: return l
         return 16.3
 
 AircraftMap.initialize_maps()

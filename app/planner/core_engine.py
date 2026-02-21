@@ -143,8 +143,15 @@ class CorePlanningEngine:
             if not assigned: uld.assigned_position = "UNASSIGNED"
 
     def _generate_report(self):
+        # Perform Final Structural Checks
+        zone_warnings = StructuralEngine.check_zone_limits(self.packed_ulds)
+        
         return {
-            "summary": {"total_ulds": len(self.packed_ulds), "total_weight": sum(u.gross_weight for u in self.packed_ulds)},
+            "summary": {
+                "total_ulds": len(self.packed_ulds), 
+                "total_weight": sum(u.gross_weight for u in self.packed_ulds),
+                "warnings": zone_warnings
+            },
             "rejected": self.rejected_cargos,
             "visualization": [
                 {"pos": u.assigned_position, "uld": u.id, "type": u.uld_type, "weight": f"{u.gross_weight:.0f}", "arm": u.assigned_arm} 
