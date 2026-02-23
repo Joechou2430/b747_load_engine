@@ -30,7 +30,7 @@ class AircraftMap:
     B747-400F Positions & Interlocks
     """
     
-    # Main Deck Centroids (Inches)
+    # 1. Main Deck Centroids (Inches)
     CENTROIDS = {
         "A": 320.0, "B": 453.0, "C": 588.0, "D": 714.0, "E": 840.0,
         "F": 966.0, "G": 1092.0, "H": 1218.0, "J": 1344.0, "K": 1470.0,
@@ -38,7 +38,6 @@ class AircraftMap:
         "S": 2155.0, "T": 2296.0
     }
 
-    # Main Deck Positions
     MAIN_POSITIONS = {
         "A1": {"deck": "Main", "type": "Center", "arm": 320.0, "conflicts": []},
         "A2": {"deck": "Main", "type": "Center", "arm": 379.0, "conflicts": []},
@@ -48,7 +47,7 @@ class AircraftMap:
     
     ROW_ZONES = ["C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "P", "Q", "R", "S"]
 
-    # Lower Deck Positions
+    # 2. Lower Deck Positions
     LOWER_POSITIONS = {
         "11P": {"deck": "Lower", "type": "Center", "arm": 513.2, "conflicts": ["11L", "11R"]},
         "11L": {"deck": "Lower", "type": "Left",   "arm": 510.4, "conflicts": ["11P"]},
@@ -93,34 +92,34 @@ class AircraftMap:
         "45R": {"deck": "Lower", "type": "Right",  "arm": 1944.2, "conflicts": []},
     }
 
-    # Linear Load Limits (Start Arm, End Arm, Limit)
+    # 3. Limits
     LINEAR_LIMITS = [
         (0, 525, 38.5), (525, 1000, 77.1), (1000, 1480, 131.5), 
         (1480, 1920, 77.1), (1920, 2500, 16.3)
     ]
 
-    # Cumulative Zone Limits (Pivot Weights)
-    # Source: Figure 33.1.18
     ZONE_LIMITS = {
         "FWD_LOWER": {"start": 360, "end": 1000, "limit": 27669},
         "AFT_LOWER": {"start": 1480, "end": 1900, "limit": 26081},
         "BULK":      {"start": 1900, "end": 2160, "limit": 4408},
-        "WINGBOX":   {"start": 1000, "end": 1480, "limit": 45000} # Estimated limit for Main Deck center
+        "WINGBOX":   {"start": 1000, "end": 1480, "limit": 45000} 
     }
 
-    # Disabled Positions
+    # 4. W&B Parameters (B747-400F Standard)
+    WB_DATA = {
+        "MAC_LEN": 327.8,  # inches
+        "LEMAC": 970.0,    # inches
+        "STD_DOW": 162000.0, # kg
+        "STD_DOI": 50.0
+    }
+    
+    ZFW_LIMITS = {"fwd": 13.0, "aft": 33.0}
+
     DISABLED_POSITIONS = set()
 
     @classmethod
     def initialize_maps(cls):
         # 1. Build Main Deck Positions
-        cls.MAIN_POSITIONS = {
-            "A1": {"deck": "Main", "type": "Center", "arm": 320.0, "conflicts": []},
-            "A2": {"deck": "Main", "type": "Center", "arm": 379.0, "conflicts": []},
-            "B":  {"deck": "Main", "type": "Center", "arm": 453.0, "conflicts": []},
-            "T":  {"deck": "Main", "type": "Center", "arm": 2296.0, "conflicts": []},
-        }
-        
         for i, z in enumerate(cls.ROW_ZONES):
             arm = cls.CENTROIDS[z]
             cls.MAIN_POSITIONS[f"{z}L"] = {"deck": "Main", "type": "Left",   "arm": arm, "conflicts": [f"{z}C"]}

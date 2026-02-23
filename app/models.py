@@ -1,49 +1,47 @@
-from dataclasses import dataclass, field
-from typing import List, Optional, Set
-from .config import ULDLibrary
+# app/models.py
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-@dataclass
-class CargoRequest:
+# --- PHASE 1 & 6: Data Models with Revenue Integration ---
+
+class Position(BaseModel):
+    name: str
+    zone: str
+    deck: str  # 'MAIN' or 'LOWER'
+    start_station: float
+    end_station: float
+    centroid_arm: float
+    max_weight: float
+    # New in Phase 6: Baseline value for displacement cost calculation
+    baseline_value: float = Field(default=0.0, description="Historical or expected revenue value of this position")
+
+class CargoItem(BaseModel):
     id: str
-    destination: str
+    uld_type: str  # e.g., 'M', 'R', 'G', 'AKE'
     weight: float
     volume: float
-    pieces: int
-    dims: List[dict] = field(default_factory=list)
-    shc: List[str] = field(default_factory=list)
-    assigned_uld_type: Optional[str] = None
+    # New in Phase 6: Revenue data for RMS
+    revenue: float = Field(default=0.0, description="Total expected revenue for this cargo")
+    is_dgr: bool = False
+    dgr_code: Optional[str] = None
 
-    @property
-    def max_height(self):
-        if not self.dims: return 0
-        return max([d.get('h', 0) for d in self.dims])
+class LoadPlanItem(BaseModel):
+    cargo: CargoItem
+    position_name: str
 
-@dataclass
-class PackedULD:
-    id: str
-    uld_type: str
-    contour: str
-    destination: str
-    items: List[CargoRequest] = field(default_factory=list)
+class LoadPlan(BaseModel):
+    items: List[LoadPlanItem]
     total_weight: float = 0.0
-    total_volume: float = 0.0
-    is_pure: bool = False
-    status: str = "OPEN"
-    shc_codes: Set[str] = field(default_factory=set)
-    assigned_position: Optional[str] = None
-    assigned_arm: float = 0.0
-    
-    # Shoring Info
-    shoring_weight: float = 0.0
-    shoring_note: str = ""
+    total_revenue: float = 0.0
+    cg_station: float = 0.0
+    mac_percent: float = 0.0
 
-    @property
-    def gross_weight(self):
-        spec = ULDLibrary.SPECS.get(self.uld_type)
-        tare = spec['tare'] if spec else 0
-        return self.total_weight + tare + self.shoring_weight
-
-    @property
-    def utilization_pct(self):
-        spec = ULDLibrary.SPECS.get(self.uld_type)
-        return (self.total_volume / spec['max_vol']) * 100 if spec else 0
+class DisplacementResult(BaseModel):
+    cargo_id: str
+    target_position: str
+    blocked_positions: List[str]
+    displacement_cost: float
+    net_profit: float
+    is_profitable: bool
+    is_loadable: bool
+    rejection_reason: Optional[str] = None
